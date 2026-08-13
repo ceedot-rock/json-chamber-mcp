@@ -1,0 +1,25 @@
+{
+  "name": "json-chamber-mcp",
+  "version": "1.1.0",
+  "description": "Chamber MCP server — JSON seal/open + benefit_check. 24h free eval, then $99 unlock. Slid Phi Labs.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "json-chamber-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "prepare": "npm run build"
+  },
+  "keywords": ["mcp", "model-context-protocol", "chamber", "json-chamber", "24h-trial", "security", "slid-phi-labs"],
+  "author": "Slid Phi Labs <corey@slidphilabs.com>",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": { "node": ">=18" },
+  "dependencies": { "@modelcontextprotocol/sdk": "^1.0.0" },
+  "devDependencies": { "@types/node": "^20.0.0", "tsx": "^4.0.0", "typescript": "^5.0.0" },
+  "files": ["dist", "README.md", "LICENSE"],
+  "repository": { "type": "git", "url": "https://github.com/ceedot-rock/json-chamber-mcp.git" },
+  "homepage": "https://www.slidphilabs.com/chamber"
+}
