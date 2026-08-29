@@ -1,19 +1,16 @@
 # json-chamber-mcp
 
-**Chamber MCP server** — seal / open JSON with φ-split keyword shares + `benefit_check`.
+**Chamber MCP** — seal / open JSON. Slid Phi Labs.
 
-24-hour free evaluation · **$99** permanent unlock · Slid Phi Labs
+24-hour try, then a **Chamber seat** ($49/mo · $490/yr) on https://www.slidphilabs.com/chamber
 
-No TRU8 residual engine in this package. That is the separate **$1,900 / project / year** tier.
+No TRU8 engine in this package.
 
 ## Install / run
 
 ```bash
 npx -y json-chamber-mcp
-npm install && npm run build && node dist/index.js
 ```
-
-Claude Desktop / Cursor:
 
 ```json
 {
@@ -29,28 +26,27 @@ Claude Desktop / Cursor:
 }
 ```
 
-Unlock: `VERIFIEDDR_API_KEY=vdr_purchased_live_...`
-
 ## Pricing
 
 | SKU | What | Price |
 |-----|------|-------|
-| **json-chamber** (this MCP) | Seal / open + benefit_check | **$99** one-time / domain |
-| **tru8-chamber** | TRU8 engine + chamber | **$1,900** / project / year |
+| Chamber try | cloak / open | 24 hours free |
+| Chamber month | seat | $49 |
+| Chamber year | seat | $490 |
+
+Prices live on the site. This README does not invent a $99 or $1,900 SKU.
 
 ## Tools
 
-| Tool | License? | Purpose |
-|------|----------|--------|
-| `chamber_status` | No | Eval remaining / dead / purchased |
-| `chamber_info` | No | Pricing + unlock instructions |
-| `benefit_check` | No | Entropy + bias → advertise $1900? |
-| `chamber_cloak` | Yes | Seal JSON / text |
-| `chamber_open` | Yes | Open sealed blob |
+| Tool | Purpose |
+|------|--------|
+| `chamber_status` | try remaining / dead / purchased |
+| `chamber_info` | pointer to live prices |
+| `chamber_cloak` | seal JSON / text |
+| `chamber_open` | open sealed blob |
 
 ## Related
 
 - Python SDK: https://github.com/ceedot-rock/json-chamber-sdk
-- Format Spec: https://github.com/ceedot-rock/json-chamber-sdk/blob/main/CHAMBER-FORMAT-v1.md
 - Product: https://www.slidphilabs.com/chamber
 - Contact: corey@slidphilabs.com
