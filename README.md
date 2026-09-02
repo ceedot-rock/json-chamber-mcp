@@ -2,9 +2,7 @@
 
 **Chamber MCP** — seal / open JSON. Slid Phi Labs.
 
-24-hour try, then a **Chamber seat** ($49/mo · $490/yr) on https://www.slidphilabs.com/chamber
-
-No TRU8 engine in this package.
+Cloak (seal new JSON) needs a live license. Open of an already-sealed blob is both keys, no extra payment. Ciphertext does not expire.
 
 ## Install / run
 
@@ -30,20 +28,21 @@ npx -y json-chamber-mcp
 
 | SKU | What | Price |
 |-----|------|-------|
-| Chamber try | cloak / open | 24 hours free |
-| Chamber month | seat | $49 |
-| Chamber year | seat | $490 |
+| Chamber try | cloak new JSON | 24 hours free |
+| Chamber month | cloak license | $9 |
+| Chamber year | cloak license | $99 |
+| Open | already-sealed blob | keys only |
 
-Prices live on the site. This README does not invent a $99 or $1,900 SKU.
+Prices live on https://www.slidphilabs.com/chamber
 
 ## Tools
 
 | Tool | Purpose |
 |------|--------|
-| `chamber_status` | try remaining / dead / purchased |
+| `chamber_status` | cloak try remaining / dead / purchased |
 | `chamber_info` | pointer to live prices |
-| `chamber_cloak` | seal JSON / text |
-| `chamber_open` | open sealed blob |
+| `chamber_cloak` | seal JSON / text (licensed) |
+| `chamber_open` | open sealed blob (keys only) |
 
 ## Related
 

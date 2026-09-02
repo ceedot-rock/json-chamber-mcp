@@ -1,7 +1,7 @@
 {
   "name": "json-chamber-mcp",
-  "version": "1.1.0",
-  "description": "Chamber MCP server — JSON seal/open + benefit_check. 24h free eval, then $99 unlock. Slid Phi Labs.",
+  "version": "1.2.0",
+  "description": "Chamber MCP — JSON seal/open. Cloak needs a live license ($9/mo · $99/yr). Open is keys-only.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

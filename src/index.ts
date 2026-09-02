@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * json-chamber-mcp — Chamber MCP Server
- * 24h free eval → $99 unlock. Tools: status, info, cloak, open, benefit_check.
- * No TRU8 residual engine.
+ * Cloak needs a live license (24h try, then $9/mo · $99/yr).
+ * Open is both keys, no extra payment. Ciphertext does not expire.
  */
 
 import { createHash } from "node:crypto";
@@ -33,7 +33,7 @@ function getMaster(): Buffer {
 }
 
 const server = new Server(
-  { name: "json-chamber-mcp", version: "1.1.0" },
+  { name: "json-chamber-mcp", version: "1.2.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -46,7 +46,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "chamber_info",
-      description: "Package info, pricing ($99 / $1900), unlock instructions.",
+      description: "Package info, cloak license ($9/mo · $99/yr), open is keys-only.",
       inputSchema: { type: "object", properties: {} },
     },
     {
@@ -63,7 +63,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "chamber_open",
-      description: "Open a sealed chamber blob. Requires live license.",
+      description: "Open a sealed chamber blob. Keys only — no license, no clock.",
       inputSchema: {
         type: "object",
         properties: {
@@ -103,15 +103,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           type: "text",
           text: JSON.stringify({
             package: "json-chamber-mcp",
-            version: "1.1.0",
+            version: "1.2.0",
             product: "json-chamber",
             lab: "Slid Phi Labs",
             pricing: {
-              "json-chamber": `$${PRICE_USD} one-time / domain`,
-              "tru8-chamber": "$1,900 / project / year (proprietary, not in this package)",
+              cloak_month: "$9 / month",
+              cloak_year: "$99 / year",
+              open: "keys only — no extra payment",
             },
-            trial: "24 hours from first run, hard cut, no grace",
-            unlock: `Set VERIFIEDDR_API_KEY=vdr_purchased_... after paying $${PRICE_USD}`,
+            trial: "24 hours of cloak from first run. Open stays keys-only after that.",
+            unlock: `Pay a cloak license at ${PURCHASE_URL}, then set VERIFIEDDR_API_KEY=vdr_purchased_...`,
             purchase_url: PURCHASE_URL,
             python_sdk: "https://github.com/ceedot-rock/json-chamber-sdk",
             license_status: st,
@@ -141,7 +142,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
     if (name === "chamber_open") {
-      licenseMgr.requireAlive();
       const sealed = a.sealed as SealedBlob;
       if (!sealed || typeof sealed !== "object") throw new Error("sealed object required");
       const opened = chamberOpen(sealed, getMaster());
