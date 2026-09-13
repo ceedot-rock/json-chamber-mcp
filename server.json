@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ceedot-rock/json-chamber-mcp",
+  "title": "Chamber",
+  "description": "Two-key JSON seal/open. Cloak needs a live license. Open is keys-only.",
+  "repository": {
+    "url": "https://github.com/ceedot-rock/json-chamber-mcp",
+    "source": "github"
+  },
+  "version": "1.2.0",
+  "websiteUrl": "https://www.slidphilabs.com/chamber",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "json-chamber-mcp",
+      "version": "1.2.0",
+      "runtimeHint": "npx",
+      "transport": { "type": "stdio" },
+      "runtimeArguments": [{ "value": "-y", "type": "positional" }]
+    }
+  ]
+}

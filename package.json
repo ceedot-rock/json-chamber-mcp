@@ -15,11 +15,12 @@
   },
   "keywords": ["mcp", "model-context-protocol", "chamber", "json-chamber", "24h-trial", "security", "slid-phi-labs"],
   "author": "Slid Phi Labs <corey@slidphilabs.com>",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "AGPL-3.0-or-later",
   "engines": { "node": ">=18" },
   "dependencies": { "@modelcontextprotocol/sdk": "^1.0.0" },
   "devDependencies": { "@types/node": "^20.0.0", "tsx": "^4.0.0", "typescript": "^5.0.0" },
   "files": ["dist", "README.md", "LICENSE"],
   "repository": { "type": "git", "url": "https://github.com/ceedot-rock/json-chamber-mcp.git" },
-  "homepage": "https://www.slidphilabs.com/chamber"
+  "homepage": "https://www.slidphilabs.com/chamber",
+  "mcpName": "io.github.ceedot-rock/json-chamber-mcp"
 }
