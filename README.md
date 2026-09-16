@@ -24,6 +24,19 @@ npx -y json-chamber-mcp
 }
 ```
 
+## Discovery
+
+| Surface | URL |
+|---------|-----|
+| Official registry id | `io.github.ceedot-rock/json-chamber-mcp` |
+| Lab well-known | https://www.slidphilabs.com/.well-known/mcp.json |
+| Lab llms.txt | https://www.slidphilabs.com/llms.txt |
+| npm | `json-chamber-mcp` 1.2.0 |
+| Server schema | [`server.json`](server.json) |
+| Product | https://www.slidphilabs.com/chamber |
+
+Hosted lab MCP (PCC + catalog): `POST https://www.slidphilabs.com/mcp` · Smithery: https://smithery.ai/servers/slidphi/lab
+
 ## Pricing
 
 | SKU | What | Price |
