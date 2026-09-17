@@ -21,7 +21,8 @@ import {
 } from "./chamber.js";
 import {
   evaluateHopGate,
-  listRejectLog,
+  formatHopGateCode,
+  listRejectLogTsv,
   type HopGateOptions,
 } from "./hop-gate.js";
 
@@ -80,15 +81,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "chamber_hop_gate",
       description:
-        "Evaluate Chamber hop-gate (exact-text codes). Gate only — does not seal/open/SettleHop. " +
-        "Wire: CUNI ChamberHop + key=value lines. PCC ≠ payment. Extras fail-closed.",
+        "Evaluate Chamber hop-gate (exact-text code). Gate only — does not seal/open/SettleHop. " +
+        "Wire: CUNI ScanChunk + url/etag/hash/agent_id. Result: single code string. PCC ≠ payment.",
       inputSchema: {
         type: "object",
         properties: {
           hop: {
             type: "string",
             description:
-              "Exact-text CUNI ChamberHop wire (not JSON). Extra keys → reject.extra (do not bind).",
+              "Exact-text CUNI ScanChunk wire (not JSON). Fields: url etag hash agent_id. Extras → reject.extra.",
           },
           allowed_agents: {
             type: "array",
@@ -102,7 +103,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "chamber_hop_reject_log",
       description:
-        "Live hop-gate reject log (sanitized). Extra-key values never rehydrate as next input.",
+        "Live hop-gate reject.log as TSV ISO\\tcode\\tpreview (Rider SoT). Extra values never rehydrate.",
       inputSchema: {
         type: "object",
         properties: {
@@ -197,8 +198,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         : undefined;
       const gateOpts: HopGateOptions = allowed ? { allowedAgents: allowed } : {};
       const result = evaluateHopGate(hop, gateOpts);
+      // Gate result wire: single exact-text code string (no JSON body)
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: formatHopGateCode(result.code) }],
         ...(result.ok ? {} : { isError: true }),
       };
     }
@@ -208,7 +210,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{
           type: "text",
-          text: JSON.stringify(listRejectLog(limit), null, 2),
+          text: listRejectLogTsv(limit),
         }],
       };
     }
