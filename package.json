@@ -1,7 +1,7 @@
 {
   "name": "json-chamber-mcp",
   "version": "1.2.0",
-  "description": "Chamber MCP — JSON seal/open. Cloak needs a live license ($9/mo · $99/yr). Open is keys-only.",
+  "description": "Chamber MCP \u2014 JSON seal/open. Cloak needs a live license ($9/mo \u00b7 $99/yr). Open is keys-only.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -11,16 +11,40 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test": "tsx --test src/hop-gate.test.ts"
   },
-  "keywords": ["mcp", "model-context-protocol", "chamber", "json-chamber", "24h-trial", "security", "slid-phi-labs"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "chamber",
+    "json-chamber",
+    "24h-trial",
+    "security",
+    "slid-phi-labs"
+  ],
   "author": "Slid Phi Labs <corey@slidphilabs.com>",
   "license": "AGPL-3.0-or-later",
-  "engines": { "node": ">=18" },
-  "dependencies": { "@modelcontextprotocol/sdk": "^1.0.0" },
-  "devDependencies": { "@types/node": "^20.0.0", "tsx": "^4.0.0", "typescript": "^5.0.0" },
-  "files": ["dist", "README.md", "LICENSE"],
-  "repository": { "type": "git", "url": "https://github.com/ceedot-rock/json-chamber-mcp.git" },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ceedot-rock/json-chamber-mcp.git"
+  },
   "homepage": "https://www.slidphilabs.com/chamber",
   "mcpName": "io.github.ceedot-rock/json-chamber-mcp"
 }

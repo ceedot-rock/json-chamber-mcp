@@ -19,6 +19,11 @@ import {
   benefitCheck,
   type SealedBlob,
 } from "./chamber.js";
+import {
+  evaluateHopGate,
+  listRejectLog,
+  type HopGateOptions,
+} from "./hop-gate.js";
 
 const licenseMgr = new LicenseManager();
 
@@ -70,6 +75,39 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           sealed: { type: "object", description: "Sealed blob from chamber_cloak" },
         },
         required: ["sealed"],
+      },
+    },
+    {
+      name: "chamber_hop_gate",
+      description:
+        "Evaluate Chamber hop-gate (exact-text codes). Gate only — does not seal/open/SettleHop. " +
+        "Wire: CUNI ChamberHop + key=value lines. PCC ≠ payment. Extras fail-closed.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          hop: {
+            type: "string",
+            description:
+              "Exact-text CUNI ChamberHop wire (not JSON). Extra keys → reject.extra (do not bind).",
+          },
+          allowed_agents: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional agent allowlist",
+          },
+        },
+        required: ["hop"],
+      },
+    },
+    {
+      name: "chamber_hop_reject_log",
+      description:
+        "Live hop-gate reject log (sanitized). Extra-key values never rehydrate as next input.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max recent entries (optional)" },
+        },
       },
     },
     {
@@ -150,6 +188,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try { parsed = JSON.parse(text); } catch { /* plain */ }
       return {
         content: [{ type: "text", text: JSON.stringify({ ok: true, data: parsed }, null, 2) }],
+      };
+    }
+    if (name === "chamber_hop_gate") {
+      const hop = a.hop;
+      const allowed = Array.isArray(a.allowed_agents)
+        ? (a.allowed_agents as string[])
+        : undefined;
+      const gateOpts: HopGateOptions = allowed ? { allowedAgents: allowed } : {};
+      const result = evaluateHopGate(hop, gateOpts);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        ...(result.ok ? {} : { isError: true }),
+      };
+    }
+    if (name === "chamber_hop_reject_log") {
+      const limit =
+        typeof a.limit === "number" ? a.limit : undefined;
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(listRejectLog(limit), null, 2),
+        }],
       };
     }
     throw new Error(`Unknown tool: ${name}`);
