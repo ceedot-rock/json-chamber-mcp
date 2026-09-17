@@ -1,25 +1,26 @@
 /**
  * Chamber hop-gate — admit/reject codes + live reject log.
  *
+ * Aligned to Agent-Rider main agent-rider-c (PR #22) SoT:
+ *   Header: CUNI ScanChunk
+ *   Fields: url, etag, hash, agent_id
+ *   Gate result wire: single exact-text code string (not JSON)
+ *   reject.replay = hash already seen
+ *   reject.log = TSV ISO\tcode\tpreview (mirrors agent-rider-c/reject.log)
+ *   reject.schema = Chamber-local only (Rider does not emit)
+ *   Wrong kind / extras → reject.extra; values never rehydrate as next input
+ *
  * Gate layer only. Seal/open APIs are untouched (see chamber.ts).
  * No SettleHop / x402 / second payment protocol.
  *
  * PCC ≠ payment: PCC is the compression/storefront face (lbr1 guts), not a
  * billing or hop-settlement channel. Hop-gate codes are admission control, not
  * payment receipts.
- *
- * Wire (Agent-Rider #17 / charggri SoT): **exact text, not JSON**.
- *   CUNI ChamberHop
- *   key=value
- *   ...
- * Extra keys fail-closed and do not bind (never rehydrate as next machine input).
- * Codes are exact text strings matching Rider chamber set + Chamber-local
- * `reject.schema` until the C tree lands that code.
  */
 
 import { createHash } from "node:crypto";
 
-/** Exact text codes — Agent-Rider #17 chamber set + Chamber-local reject.schema. */
+/** Exact text codes — Rider chamber set + Chamber-local reject.schema. */
 export type HopGateCode =
   | "admit"
   | "reject.schema"
@@ -39,32 +40,28 @@ export const HOP_GATE_CODES: readonly HopGateCode[] = [
   "reject.empty",
 ] as const;
 
-/** Kind line for Chamber hop exact-text wire. */
-export const CHAMBER_HOP_KIND = "ChamberHop";
-export const CHAMBER_HOP_HEADER = `CUNI ${CHAMBER_HOP_KIND}`;
+/** Kind line for Rider ScanChunk exact-text wire (agent-rider-c/cuni.c). */
+export const SCAN_CHUNK_KIND = "ScanChunk";
+export const SCAN_CHUNK_HEADER = `CUNI ${SCAN_CHUNK_KIND}`;
+
+/** @deprecated Use SCAN_CHUNK_HEADER — kept as alias during align. */
+export const CHAMBER_HOP_KIND = SCAN_CHUNK_KIND;
+/** @deprecated Use SCAN_CHUNK_HEADER */
+export const CHAMBER_HOP_HEADER = SCAN_CHUNK_HEADER;
 
 /**
- * Allowlisted keys on CUNI ChamberHop (extras → reject.extra, do not bind).
+ * Allowlisted keys on CUNI ScanChunk (agent-rider-c/cuni.h scan_chunk).
+ * Extras → reject.extra, do not bind.
  */
-export const HOP_ALLOWED_KEYS = [
-  "agent_id",
-  "hop_id",
-  "nonce",
-  "hash",
-  "payload",
-  "schema_id",
-] as const;
+export const HOP_ALLOWED_KEYS = ["url", "etag", "hash", "agent_id"] as const;
 
 export type HopAllowedKey = (typeof HOP_ALLOWED_KEYS)[number];
 
 export type HopGateInput = {
-  agent_id?: string;
-  hop_id?: string;
-  nonce?: string;
-  /** Hex SHA-256 of payload text; if present must match. */
+  url?: string;
+  etag?: string;
   hash?: string;
-  payload?: string;
-  schema_id?: string;
+  agent_id?: string;
 };
 
 export type HopGateResult = {
@@ -73,19 +70,24 @@ export type HopGateResult = {
   reason?: string;
   at: string;
   agent_id?: string;
-  hop_id?: string;
   hash?: string;
-  schema_id?: string;
+  url?: string;
+  etag?: string;
 };
 
-export type RejectLogEntry = HopGateResult & {
-  /** Safe preview only — never full CuNi extra-key values as next machine input. */
-  sanitized_preview?: string;
+export type RejectLogEntry = {
+  at: string;
+  code: HopGateCode;
+  /** Safe preview — newlines→spaces, truncated ~120; never full extra-key values as next input. */
+  preview: string;
 };
 
 export type HopGateOptions = {
   allowedAgents?: ReadonlySet<string> | readonly string[];
   now?: () => Date;
+  /** Replay set: hashes already seen (Rider chamber_policy.seen_hashes). */
+  seenHashes?: Set<string>;
+  /** @deprecated alias for seenHashes */
   seenNonces?: Set<string>;
   logAdmits?: boolean;
 };
@@ -93,9 +95,10 @@ export type HopGateOptions = {
 const DEFAULT_SEEN = new Set<string>();
 const REJECT_LOG: RejectLogEntry[] = [];
 const ALLOWED_SET = new Set<string>(HOP_ALLOWED_KEYS);
+const PREVIEW_MAX = 120;
 
 function isoNow(now?: () => Date): string {
-  return (now ? now() : new Date()).toISOString();
+  return (now ? now() : new Date()).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 function asAgentSet(
@@ -121,7 +124,7 @@ function result(
   };
 }
 
-/** SHA-256 hex of payload exact text (utf8). */
+/** SHA-256 hex helper (not used by Rider ScanChunk admit — hash is opaque SoT). */
 export function payloadHash(payload: string): string {
   return createHash("sha256").update(payload, "utf8").digest("hex");
 }
@@ -143,10 +146,11 @@ export type ExactParseFail = {
 export type ExactParseResult = ExactParseOk | ExactParseFail;
 
 /**
- * Parse CUNI ChamberHop exact-text wire.
+ * Parse CUNI ScanChunk exact-text wire (mirrors cuni_parse_scan_chunk).
  * Unknown keys are listed in `extras` and must not bind.
+ * Wrong kind → reject.extra (Rider chamber_admit_scan maps KIND→extra).
  */
-export function parseChamberHopText(text: unknown): ExactParseResult {
+export function parseScanChunkText(text: unknown): ExactParseResult {
   const emptyFields: HopGateInput = {};
   if (text === null || text === undefined) {
     return {
@@ -192,12 +196,12 @@ export function parseChamberHopText(text: unknown): ExactParseResult {
 
   const header = lines[i].trim();
   i++;
-  if (header !== CHAMBER_HOP_HEADER) {
-    // Chamber-local until C tree names kind rejects; map wrong kind → reject.schema
+  if (header !== SCAN_CHUNK_HEADER) {
+    // Rider: CUNI_ERR_KIND → reject.extra in chamber_admit_scan
     return {
       ok: false,
-      code: "reject.schema",
-      reason: `expected header "${CHAMBER_HOP_HEADER}", got ${JSON.stringify(header)}`,
+      code: "reject.extra",
+      reason: `expected header "${SCAN_CHUNK_HEADER}", got ${JSON.stringify(header)}`,
       fields: emptyFields,
       extras: [],
     };
@@ -212,9 +216,10 @@ export function parseChamberHopText(text: unknown): ExactParseResult {
     if (!line) continue;
     const eq = line.indexOf("=");
     if (eq <= 0) {
+      // Rider parse_kv: no '=' → CUNI_ERR_EXTRA
       return {
         ok: false,
-        code: "reject.schema",
+        code: "reject.extra",
         reason: `malformed kv line: ${JSON.stringify(line)}`,
         fields,
         extras,
@@ -253,10 +258,13 @@ export function parseChamberHopText(text: unknown): ExactParseResult {
   return { ok: true, fields, extras: [] };
 }
 
+/** @deprecated Use parseScanChunkText */
+export const parseChamberHopText = parseScanChunkText;
+
 /** Bound fields only — extras never appear. */
 export function sanitizeHopInput(input: unknown): HopGateInput | null {
   if (typeof input === "string") {
-    const p = parseChamberHopText(input);
+    const p = parseScanChunkText(input);
     return { ...p.fields }; // bound only; extras already unbound
   }
   if (input === null || input === undefined) return null;
@@ -277,11 +285,11 @@ export function nextMachineInput(input: unknown): HopGateInput | null {
 }
 
 /**
- * Format a ChamberHop exact-text message from bound fields only.
+ * Format a ScanChunk exact-text message from bound fields only.
  * Extra keys on `fields` are ignored (do not bind).
  */
-export function formatChamberHopText(fields: HopGateInput): string {
-  const lines = [CHAMBER_HOP_HEADER];
+export function formatScanChunkText(fields: HopGateInput): string {
+  const lines = [SCAN_CHUNK_HEADER];
   for (const key of HOP_ALLOWED_KEYS) {
     const v = fields[key];
     if (v !== undefined && v !== "") {
@@ -291,38 +299,48 @@ export function formatChamberHopText(fields: HopGateInput): string {
   return lines.join("\n") + "\n";
 }
 
-/** Exact-text result line: just the code (wire-facing). */
+/** @deprecated Use formatScanChunkText */
+export const formatChamberHopText = formatScanChunkText;
+
+/** Exact-text result wire: single code string (no JSON body). */
 export function formatHopGateCode(code: HopGateCode): string {
   return code;
 }
 
-function previewSanitized(
-  code: HopGateCode,
-  fields: HopGateInput,
+/**
+ * Sanitize preview like chamber_log_reject: newlines→spaces, truncate ~120.
+ * Prefer bound wire text; never store unbound extra VALUES as next machine input.
+ */
+export function sanitizePreview(
+  source: string | HopGateInput,
   extras?: string[]
 ): string {
-  if (code === "reject.extra") {
-    return [
-      "dropped_extra_keys=" + (extras ?? []).join(","),
-      "note=extra keys do not bind; values omitted from reject log",
-      ...HOP_ALLOWED_KEYS.filter((k) => fields[k] !== undefined).map(
-        (k) => `${k}=${String(fields[k]).slice(0, 80)}`
-      ),
-    ].join("\n");
-  }
-  const parts: string[] = [];
-  for (const k of HOP_ALLOWED_KEYS) {
-    if (fields[k] !== undefined) {
-      const v = String(fields[k]);
-      parts.push(`${k}=${v.length > 80 ? v.slice(0, 80) + "…" : v}`);
+  let text: string;
+  if (typeof source === "string") {
+    text = source;
+  } else {
+    const parts = [SCAN_CHUNK_HEADER];
+    for (const k of HOP_ALLOWED_KEYS) {
+      if (source[k] !== undefined) parts.push(`${k}=${source[k]}`);
     }
+    if (extras && extras.length) {
+      // key names only — values omitted
+      for (const k of extras) parts.push(`${k}=`);
+    }
+    text = parts.join(" ");
   }
-  return parts.join("\n");
+  let safe = text.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  if (safe.length > PREVIEW_MAX) safe = safe.slice(0, PREVIEW_MAX);
+  return safe;
+}
+
+function seenSet(options: HopGateOptions): Set<string> {
+  return options.seenHashes ?? options.seenNonces ?? DEFAULT_SEEN;
 }
 
 /**
- * Evaluate hop admission from exact-text wire (primary) or bound object
- * (Chamber-local / MCP). Extra keys fail-closed and do not bind.
+ * Evaluate ScanChunk admission (mirrors chamber_admit_scan).
+ * Extra keys fail-closed and do not bind.
  * Does not call seal/open. Does not settle payment / SettleHop.
  */
 export function evaluateHopGate(
@@ -330,29 +348,31 @@ export function evaluateHopGate(
   options: HopGateOptions = {}
 ): HopGateResult {
   const at = isoNow(options.now);
-  const seen = options.seenNonces ?? DEFAULT_SEEN;
+  const seen = seenSet(options);
 
   let fields: HopGateInput;
   let extras: string[] = [];
+  let rawPreview = "";
 
   if (typeof input === "string" || input === null || input === undefined) {
-    const parsed = parseChamberHopText(input);
+    if (typeof input === "string") rawPreview = input;
+    const parsed = parseScanChunkText(input);
     fields = parsed.fields;
     extras = parsed.extras;
     if (!parsed.ok) {
       const r = result(parsed.code, parsed.reason, at, {
         agent_id: fields.agent_id,
-        hop_id: fields.hop_id,
-        schema_id: fields.schema_id,
         hash: fields.hash,
+        url: fields.url,
+        etag: fields.etag,
       });
-      appendRejectLog(
-        {
-          ...r,
-          sanitized_preview: previewSanitized(parsed.code, fields, extras),
-        },
-        options
-      );
+      // Extras: bound fields + key names only (values never rehydrate / never logged).
+      // Other rejects: flattened wire preview (Rider reject.log style).
+      const preview =
+        parsed.code === "reject.extra" && extras.length
+          ? sanitizePreview(fields, extras)
+          : sanitizePreview(rawPreview || fields);
+      appendRejectLog({ at, code: parsed.code, preview }, options);
       return r;
     }
   } else if (typeof input === "object" && !Array.isArray(input)) {
@@ -370,7 +390,7 @@ export function evaluateHopGate(
           at
         );
         appendRejectLog(
-          { ...r, sanitized_preview: previewSanitized("reject.schema", fields) },
+          { at, code: "reject.schema", preview: sanitizePreview(fields) },
           options
         );
         return r;
@@ -384,14 +404,16 @@ export function evaluateHopGate(
         at,
         {
           agent_id: fields.agent_id,
-          hop_id: fields.hop_id,
-          schema_id: fields.schema_id,
+          hash: fields.hash,
+          url: fields.url,
+          etag: fields.etag,
         }
       );
       appendRejectLog(
         {
-          ...r,
-          sanitized_preview: previewSanitized("reject.extra", fields, extras),
+          at,
+          code: "reject.extra",
+          preview: sanitizePreview(fields, extras),
         },
         options
       );
@@ -400,59 +422,32 @@ export function evaluateHopGate(
   } else {
     const r = result(
       "reject.schema",
-      "hop wire must be exact text (CUNI ChamberHop)",
+      "hop wire must be exact text (CUNI ScanChunk)",
       at
     );
-    appendRejectLog({ ...r, sanitized_preview: "" }, options);
+    appendRejectLog({ at, code: "reject.schema", preview: "" }, options);
     return r;
   }
 
-  // Empty / missing required payload
-  if (fields.payload === undefined || fields.payload === "") {
-    const r = result("reject.empty", "empty or missing payload", at, {
-      agent_id: fields.agent_id,
-      hop_id: fields.hop_id,
-      schema_id: fields.schema_id,
-    });
-    appendRejectLog(
-      { ...r, sanitized_preview: previewSanitized("reject.empty", fields) },
-      options
+  // Rider: missing url / hash / agent_id → reject.empty (CUNI_ERR_MISSING)
+  if (!fields.url || !fields.hash || !fields.agent_id) {
+    const r = result(
+      "reject.empty",
+      "missing required ScanChunk fields (url, hash, agent_id)",
+      at,
+      {
+        agent_id: fields.agent_id,
+        hash: fields.hash,
+        url: fields.url,
+        etag: fields.etag,
+      }
     );
-    return r;
-  }
-
-  // Hash mismatch (exact-text payload bytes)
-  const computed = payloadHash(fields.payload);
-  if (fields.hash !== undefined && fields.hash !== computed) {
-    const r = result("reject.hash", "payload hash mismatch", at, {
-      agent_id: fields.agent_id,
-      hop_id: fields.hop_id,
-      hash: fields.hash,
-      schema_id: fields.schema_id,
-    });
     appendRejectLog(
-      { ...r, sanitized_preview: previewSanitized("reject.hash", fields) },
-      options
-    );
-    return r;
-  }
-
-  // Replay
-  const replayKey =
-    fields.nonce !== undefined
-      ? `nonce:${fields.nonce}`
-      : fields.hop_id !== undefined
-        ? `hop:${fields.hop_id}`
-        : null;
-  if (replayKey && seen.has(replayKey)) {
-    const r = result("reject.replay", "nonce/hop_id already seen", at, {
-      agent_id: fields.agent_id,
-      hop_id: fields.hop_id,
-      hash: fields.hash ?? computed,
-      schema_id: fields.schema_id,
-    });
-    appendRejectLog(
-      { ...r, sanitized_preview: previewSanitized("reject.replay", fields) },
+      {
+        at,
+        code: "reject.empty",
+        preview: sanitizePreview(rawPreview || fields),
+      },
       options
     );
     return r;
@@ -461,34 +456,58 @@ export function evaluateHopGate(
   // Agent allowlist
   const agents = asAgentSet(options.allowedAgents);
   if (agents) {
-    if (!fields.agent_id || !agents.has(fields.agent_id)) {
+    if (!agents.has(fields.agent_id)) {
       const r = result("reject.agent", "agent identity / allowlist fail", at, {
         agent_id: fields.agent_id,
-        hop_id: fields.hop_id,
-        hash: fields.hash ?? computed,
-        schema_id: fields.schema_id,
+        hash: fields.hash,
+        url: fields.url,
+        etag: fields.etag,
       });
       appendRejectLog(
-        { ...r, sanitized_preview: previewSanitized("reject.agent", fields) },
+        {
+          at,
+          code: "reject.agent",
+          preview: sanitizePreview(rawPreview || fields),
+        },
         options
       );
       return r;
     }
   }
 
-  if (replayKey) seen.add(replayKey);
+  // Replay = hash already seen (Rider chamber_policy.seen_hashes)
+  if (seen.has(fields.hash)) {
+    const r = result("reject.replay", "hash already seen", at, {
+      agent_id: fields.agent_id,
+      hash: fields.hash,
+      url: fields.url,
+      etag: fields.etag,
+    });
+    appendRejectLog(
+      {
+        at,
+        code: "reject.replay",
+        preview: sanitizePreview(rawPreview || fields),
+      },
+      options
+    );
+    return r;
+  }
+
+  seen.add(fields.hash);
 
   const admitted = result("admit", undefined, at, {
     agent_id: fields.agent_id,
-    hop_id: fields.hop_id,
-    hash: fields.hash ?? computed,
-    schema_id: fields.schema_id,
+    hash: fields.hash,
+    url: fields.url,
+    etag: fields.etag,
   });
   if (options.logAdmits) {
     appendRejectLog(
       {
-        ...admitted,
-        sanitized_preview: previewSanitized("admit", fields),
+        at,
+        code: "admit",
+        preview: sanitizePreview(rawPreview || fields),
       },
       options
     );
@@ -497,20 +516,37 @@ export function evaluateHopGate(
 }
 
 /**
- * Append-only live reject log.
- * Extra-key rejects store key names + bound fields only — never CuNi extra values.
+ * Append-only live reject log (mirrors chamber_log_reject / reject.log).
+ * Line format: ISO\tcode\tpreview
  */
 export function appendRejectLog(
   entry: RejectLogEntry,
   _options?: HopGateOptions
 ): void {
-  REJECT_LOG.push({ ...entry });
+  REJECT_LOG.push({
+    at: entry.at,
+    code: entry.code,
+    preview: entry.preview ?? "",
+  });
+}
+
+/** Format one reject.log TSV line: ISO\tcode\tpreview */
+export function formatRejectLogLine(entry: RejectLogEntry): string {
+  const preview = (entry.preview ?? "").replace(/[\r\n\t]/g, " ");
+  return `${entry.at}\t${entry.code}\t${preview}`;
 }
 
 export function listRejectLog(limit?: number): RejectLogEntry[] {
   if (limit === undefined || limit < 0) return REJECT_LOG.slice();
   if (limit === 0) return [];
   return REJECT_LOG.slice(-limit);
+}
+
+/** Full reject.log body as TSV text (mirrors agent-rider-c/reject.log). */
+export function listRejectLogTsv(limit?: number): string {
+  const rows = listRejectLog(limit);
+  if (!rows.length) return "";
+  return rows.map(formatRejectLogLine).join("\n") + "\n";
 }
 
 export function resetHopGateState(): void {

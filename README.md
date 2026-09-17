@@ -60,33 +60,33 @@ Prices live on https://www.slidphilabs.com/chamber
 | `chamber_hop_reject_log` | live sanitized reject log |
 
 
-## Hop-gate (issue #1)
+## Hop-gate (ScanChunk / Rider SoT)
 
 Admission layer in front of seal/open. **Seal/open APIs are unchanged.** No SettleHop / x402.
 
-Wire is **exact text** (Agent-Rider #17), not JSON:
+Wire is **exact text** (Agent-Rider `agent-rider-c` / PR #22), not JSON:
 
 ```
-CUNI ChamberHop
-agent_id=…
-hop_id=…
-nonce=…
-hash=…
-payload=…
-schema_id=…
+CUNI ScanChunk
+url=https://example.com/
+etag="abc"
+hash=sha256:…
+agent_id=agt_1
 ```
+
+Fields (allowlist): `url` · `etag` · `hash` · `agent_id`. Gate **result wire** is a single exact-text code string (not a JSON body).
 
 | Code | Meaning |
 |------|---------|
 | `admit` | hop allowed |
-| `reject.schema` | Chamber-local schema/kind fail (until C tree) |
-| `reject.extra` | unknown keys — fail-closed; do not bind; never rehydrate |
-| `reject.hash` | hash mismatch |
-| `reject.replay` | nonce / hop_id already seen |
+| `reject.schema` | Chamber-local only (Rider does not emit) |
+| `reject.extra` | unknown keys or wrong kind — fail-closed; do not bind; never rehydrate |
+| `reject.hash` | empty / invalid hash |
+| `reject.replay` | **hash** already seen |
 | `reject.agent` | agent allowlist fail |
-| `reject.empty` | empty / missing payload |
+| `reject.empty` | empty / missing required fields (`url`, `hash`, `agent_id`) |
 
-Live reject log records rejects with sanitized previews (extra-key **values** omitted).
+Live `reject.log` is TSV `ISO\tcode\tpreview` (mirrors `agent-rider-c/reject.log`); preview truncates ~120 and flattens newlines. Extra-key **values** never rehydrate as next machine input.
 
 **PCC ≠ payment** — PCC is the compression/storefront face; hop-gate codes are admission control, not billing.
 
