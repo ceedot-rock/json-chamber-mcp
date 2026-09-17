@@ -58,7 +58,7 @@ function bytesToWords(data: Buffer): string {
 }
 
 function wordsToBytes(text: string, expectedLen: number): Buffer {
-  const idx = new Map(WORDLIST.map((w, i) => [w, i]));
+  const idx = new Map<string, number>(WORDLIST.map((w, i) => [w, i]));
   const parts = text.trim().split(/\s+/);
   const out: number[] = [];
   for (let i = 0; i + 3 < parts.length; i += 4) {

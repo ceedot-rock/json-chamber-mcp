@@ -56,6 +56,41 @@ Prices live on https://www.slidphilabs.com/chamber
 | `chamber_info` | pointer to live prices |
 | `chamber_cloak` | seal JSON / text (licensed) |
 | `chamber_open` | open sealed blob (keys only) |
+| `chamber_hop_gate` | admit/reject hop (gate only) |
+| `chamber_hop_reject_log` | live sanitized reject log |
+
+
+## Hop-gate (issue #1)
+
+Admission layer in front of seal/open. **Seal/open APIs are unchanged.** No SettleHop / x402.
+
+Wire is **exact text** (Agent-Rider #17), not JSON:
+
+```
+CUNI ChamberHop
+agent_id=…
+hop_id=…
+nonce=…
+hash=…
+payload=…
+schema_id=…
+```
+
+| Code | Meaning |
+|------|---------|
+| `admit` | hop allowed |
+| `reject.schema` | Chamber-local schema/kind fail (until C tree) |
+| `reject.extra` | unknown keys — fail-closed; do not bind; never rehydrate |
+| `reject.hash` | hash mismatch |
+| `reject.replay` | nonce / hop_id already seen |
+| `reject.agent` | agent allowlist fail |
+| `reject.empty` | empty / missing payload |
+
+Live reject log records rejects with sanitized previews (extra-key **values** omitted).
+
+**PCC ≠ payment** — PCC is the compression/storefront face; hop-gate codes are admission control, not billing.
+
+MCP tools: `chamber_hop_gate`, `chamber_hop_reject_log`.
 
 ## Related
 
