@@ -1,5 +1,8 @@
 # json-chamber-mcp
 
+[![Audited checks](https://github.com/ceedot-rock/json-chamber-mcp/actions/workflows/audited-checks.yml/badge.svg)](https://github.com/ceedot-rock/json-chamber-mcp/actions/workflows/audited-checks.yml)
+[![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
+
 **Chamber MCP** — seal / open JSON. Slid Phi Labs.
 
 Cloak (seal new JSON) needs a live license. Open of an already-sealed blob is both keys, no extra payment. Ciphertext does not expire.
